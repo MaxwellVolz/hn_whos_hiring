@@ -1,10 +1,8 @@
-# hn_whos_hiring
+<p align="center">
+  <img alt="Hacker News: Who's Hiring?" src="docs/logo.png" width="560">
+</p>
 
-**Every post in Hacker News' monthly "Who is hiring?" thread, ranked against your resume.**
-
-The thread gets hundreds of posts every month, and reading them all takes an evening. This reads every one, scores it against your resume and what you're looking for, explains each score, drafts the email, and fills in the application form. It runs on your machine, using your own Claude subscription.
-
-![Dashboard: matches ranked by fit, with reasons, concerns and apply links](docs/screenshots/dashboard.jpg)
+<h3 align="center">Every post in Hacker News' monthly "Who is hiring?" thread, ranked against your resume.</h3>
 
 <p align="center">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue">
@@ -12,6 +10,10 @@ The thread gets hundreds of posts every month, and reading them all takes an eve
   <img alt="No dependencies" src="https://img.shields.io/badge/pip%20install-nothing-brightgreen">
   <img alt="Runs on Claude Code" src="https://img.shields.io/badge/runs%20on-Claude%20Code-d97757">
 </p>
+
+The thread gets hundreds of posts every month, and reading them all takes an evening. This reads every one, scores it against your resume and what you're looking for, explains each score, drafts the email, and fills in the application form. It runs on your machine, using your own Claude subscription.
+
+![Dashboard: matches ranked by fit, with reasons, concerns and apply links](docs/screenshots/dashboard.jpg)
 
 ## What you get
 
