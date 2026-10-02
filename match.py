@@ -14,11 +14,8 @@ import json
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
-
 import candidate
-
-ROOT = Path(__file__).parent
+from config import CLAUDE, DATA
 
 JOB_SCHEMA = {
     "type": "object",
@@ -74,7 +71,7 @@ def score_batch(posts, context, model):
     body = "\n\n".join(f"<post id=\"{p['id']}\">\n{p['text']}\n</post>" for p in posts)
     prompt = f"{context}\n\nScore these {len(posts)} posts:\n\n{body}"
     proc = subprocess.run(
-        ["claude", "-p", "--model", model, "--output-format", "json", "--tools", "",
+        [CLAUDE, "-p", "--model", model, "--output-format", "json", "--tools", "",
          "--strict-mcp-config", "--no-session-persistence",
          "--append-system-prompt", SYSTEM, "--json-schema", json.dumps(SCHEMA)],
         input=prompt, capture_output=True, text=True, timeout=600,
@@ -94,7 +91,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     args = ap.parse_args()
 
-    data_dir = ROOT / "data" / args.key
+    data_dir = DATA / args.key
     posts = [p for p in json.loads((data_dir / "posts.json").read_text())["posts"] if not p["removed"]]
     if not candidate.ready():
         sys.exit("Fill in your profile first: run server.py and open the Profile page.")
@@ -129,7 +126,7 @@ def main():
                     cache[str(j["id"])] = j
             out_path.write_text(json.dumps(cache, indent=1, ensure_ascii=False))
             print(f"  {n}/{len(batches)} batches  (${cost:.2f})")
-    print(f"done: {len(cache)} scored, {failed} failed, ${cost:.2f} -> {out_path.relative_to(ROOT)}")
+    print(f"done: {len(cache)} scored, {failed} failed, ${cost:.2f} -> {out_path}")
 
 
 if __name__ == "__main__":

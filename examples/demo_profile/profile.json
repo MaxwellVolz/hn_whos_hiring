@@ -1,0 +1,30 @@
+{
+  "name": "Jordan Lee",
+  "email": "jordan@example.com",
+  "phone": "555-0142",
+  "location": "Brooklyn, NY",
+  "linkedin": "https://www.linkedin.com/in/example",
+  "github": "https://github.com/example",
+  "current_company": "Lattice Health",
+  "roles": [
+    "AI / LLM product engineering: agents, RAG, evals",
+    "Full-stack product engineering (TypeScript, React, Python)",
+    "Developer tools and platform"
+  ],
+  "locations": [
+    "Remote (US)",
+    "New York, onsite or hybrid"
+  ],
+  "seniority": "Senior or Staff engineer, 9 years",
+  "dealbreakers": "Crypto or gambling. Onsite outside New York.",
+  "strengths": "Led the LLM triage assistant at Lattice Health: 40% fewer manual chart reviews.\nBuilt the eval harness and prompt regression suite used by 6 teams.\nShipped a React design system adopted across 4 products.",
+  "work_authorization": "US Citizen",
+  "requires_sponsorship": "No",
+  "open_to_relocation": "No",
+  "start_date": "4 weeks notice",
+  "salary_expectation": "$190k+",
+  "degree": "BS Computer Science",
+  "years_experience": "9",
+  "skills": "TypeScript, React, Next.js, Node, Python, FastAPI, Postgres, AWS, Docker, LLM evals, RAG",
+  "heard_about": "Hacker News \"Who is hiring?\""
+}

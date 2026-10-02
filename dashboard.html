@@ -39,6 +39,7 @@ main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; height: c
 #detail { overflow-y: auto; padding: 20px 28px 60px; }
 #detail h2 { margin: 0 0 2px; font-size: 22px; }
 .meta { color: var(--muted); margin-bottom: 14px; }
+.meta a, .box a { color: var(--accent); }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
 .box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
 .box h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
@@ -143,7 +144,9 @@ function render() {
           ${m.salary ? `<span class="chip">${esc(m.salary)}</span>` : ""}
           ${s !== "new" ? `<span class="chip st-${s}">${s}</span>` : ""}
           ${j.draft ? `<span class="chip">✉ draft</span>` : ""}</div></div></div>`;
-  }).join("") || `<div class="empty">No jobs match these filters.</div>`;
+  }).join("") || (DATA.jobs.length
+    ? `<div class="empty">No jobs match these filters.</div>`
+    : `<div class="empty">No posts yet. Click <b>Refresh</b> to fetch this month's thread and score it against your profile.</div>`);
   if (sel) renderDetail();
 }
 

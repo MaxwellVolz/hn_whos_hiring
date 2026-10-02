@@ -18,6 +18,7 @@ from pathlib import Path
 
 import candidate
 import outreach
+from config import DATA, THREADS
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -34,7 +35,7 @@ def save(p, obj):
 
 
 def jobs(key):
-    d = ROOT / "data" / key
+    d = DATA / str(key)
     posts = load(d / "posts.json", {"posts": []})
     matches, state = load(d / "matches.json", {}), load(d / "state.json", {})
     drafts, queue = load(d / "outreach.json", {}), load(d / "queue.json", [])
@@ -57,23 +58,29 @@ def jobs(key):
             "profile_ready": candidate.ready(), "refresh": REFRESH, "jobs": rows}
 
 
-def refresh(key):
-    """Scrape the thread, then score new posts. Runs in a background thread."""
+def run(*args):
+    proc = subprocess.Popen([sys.executable, "-u", *args], cwd=ROOT,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for line in proc.stdout:
+        REFRESH["log"] += line
+    return proc.wait() == 0
+
+
+def refresh():
+    """Scrape (finding this month's thread unless one was pinned), then score. Runs in a background thread."""
     REFRESH.update(running=True, log="")
     try:
-        for script in ("scrape.py", "match.py"):
-            proc = subprocess.Popen([sys.executable, str(ROOT / script), key], cwd=ROOT,
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            for line in proc.stdout:
-                REFRESH["log"] += line
-            if proc.wait() != 0:
-                break
+        if run(str(ROOT / "scrape.py"), *([H.key] if H.pinned else [])):
+            if not H.pinned:
+                H.key = next(reversed(load(THREADS, {})))
+            run(str(ROOT / "match.py"), H.key)
     finally:
         REFRESH["running"] = False
 
 
 class H(BaseHTTPRequestHandler):
     key = None
+    pinned = False  # True when a thread key was given on the command line
 
     def send(self, code, body, ctype="application/json"):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
@@ -111,7 +118,7 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:
                 return self.send(500, {"error": str(e)[:500]})
         body = json.loads(raw or b"{}")
-        d = ROOT / "data" / self.key
+        d = DATA / str(self.key)
         sid = str(body.get("id"))
         now = datetime.now(timezone.utc).isoformat()
         try:
@@ -123,7 +130,7 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, {"ok": True, "ready": candidate.ready()})
             if self.path == "/api/refresh":
                 if not REFRESH["running"]:
-                    threading.Thread(target=refresh, args=(self.key,), daemon=True).start()
+                    threading.Thread(target=refresh, daemon=True).start()
                 return self.send(200, {"ok": True})
             if self.path == "/api/state":
                 with LOCK:
@@ -157,14 +164,12 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    threads = load(ROOT / "threads.json", {})
+    threads = load(THREADS, {})
     ap = argparse.ArgumentParser()
     ap.add_argument("key", nargs="?", default=next(reversed(threads), None),
-                    help="thread key from threads.json (default: the newest)")
+                    help="thread key from data/threads.json (default: the newest)")
     ap.add_argument("--port", type=int, default=8787)
     a = ap.parse_args()
-    if not a.key:
-        sys.exit("No thread yet. Register one: python3 scrape.py <key> <hn item id>")
-    H.key = a.key
-    print(f"dashboard: http://localhost:{a.port}  ({a.key})")
+    H.key, H.pinned = a.key, a.key is not None and a.key != next(reversed(threads), None)
+    print(f"dashboard: http://localhost:{a.port}  ({a.key or 'click Refresh to fetch this month'})")
     ThreadingHTTPServer(("127.0.0.1", a.port), H).serve_forever()

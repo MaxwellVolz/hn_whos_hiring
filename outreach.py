@@ -10,10 +10,9 @@ import argparse
 import json
 import subprocess
 from datetime import datetime, timezone
-from pathlib import Path
 
 import candidate
-from match import ROOT
+from config import CLAUDE, DATA
 
 SCHEMA = {
     "type": "object",
@@ -38,7 +37,7 @@ def load(path, default):
 
 
 def draft(key, post_id, model="sonnet", force=False):
-    d = ROOT / "data" / key
+    d = DATA / key
     out_path = d / "outreach.json"
     drafts = load(out_path, {})
     if str(post_id) in drafts and not force:
@@ -50,7 +49,7 @@ def draft(key, post_id, model="sonnet", force=False):
               f"Best-fit role: {match.get('best_role', '')}\nWhy it fits: {'; '.join(match.get('reasons', []))}\n"
               f"Hook: {match.get('outreach_hook', '')}\nApply instructions: {match.get('apply_instructions', '')}")
     proc = subprocess.run(
-        ["claude", "-p", "--model", model, "--output-format", "json", "--tools", "",
+        [CLAUDE, "-p", "--model", model, "--output-format", "json", "--tools", "",
          "--strict-mcp-config", "--no-session-persistence",
          "--append-system-prompt", SYSTEM, "--json-schema", json.dumps(SCHEMA)],
         input=prompt, capture_output=True, text=True, timeout=300,

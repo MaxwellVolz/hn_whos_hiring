@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Scrape top-level posts from an HN "Who is hiring?" thread into structured JSON.
 
-    python3 scrape.py 10_1_26            # thread key from threads.json
-    python3 scrape.py 10_1_26 49922569   # register a new key -> item id
+    python3 scrape.py                    # find this month's thread and scrape it
+    python3 scrape.py 2026-10            # re-scrape a known thread
+    python3 scrape.py 2026-10 49922569   # register a key -> HN item id by hand
 
 Re-runnable: new posts are added, edited posts are updated, deleted/dead posts are
 flagged (not removed), and `first_seen` is preserved. Output:
-data/<key>/posts.json
+data/<key>/posts.json, with keys -> item ids in data/threads.json.
 """
 import html
 import json
@@ -15,10 +16,12 @@ import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from pathlib import Path
+from urllib.parse import quote
 
-ROOT = Path(__file__).parent
+from config import DATA, THREADS
+
 API = "https://hacker-news.firebaseio.com/v0/item/{}.json"
+SEARCH = "https://hn.algolia.com/api/v1/search_by_date?tags=story,author_whoishiring&query=" + quote("Who is hiring")
 
 
 def fetch(item_id):
@@ -75,16 +78,32 @@ def extract(post):
     }
 
 
+def latest_thread():
+    """The newest "Ask HN: Who is hiring?" story by the whoishiring account: (key, item id)."""
+    with urllib.request.urlopen(SEARCH, timeout=30) as r:
+        hits = [h for h in json.load(r)["hits"] if h["title"].startswith("Ask HN: Who is hiring?")]
+    h = hits[0]
+    return h["created_at"][:7], int(h["objectID"])  # key like 2026-10
+
+
 def main():
-    threads_file = ROOT / "threads.json"
-    threads = json.loads(threads_file.read_text()) if threads_file.exists() else {}
-    if len(sys.argv) < 2:
-        sys.exit(f"usage: scrape.py <key> [item_id]   known: {', '.join(threads)}")
-    key = sys.argv[1]
+    threads = json.loads(THREADS.read_text()) if THREADS.exists() else {}
     if len(sys.argv) > 2:
-        threads[key] = int(sys.argv[2])
-        threads_file.write_text(json.dumps(threads, indent=2) + "\n")
-    story_id = threads[key]
+        key, story_id = sys.argv[1], int(sys.argv[2])
+    elif len(sys.argv) == 2:
+        key = sys.argv[1]
+        if key not in threads:
+            sys.exit(f"unknown thread {key!r}; known: {', '.join(threads) or 'none'}")
+        story_id = threads[key]
+    else:
+        key, story_id = latest_thread()
+        # already registered under another key (e.g. by hand): keep that key
+        key = next((k for k, v in threads.items() if v == story_id), key)
+    if threads.get(key) != story_id:
+        threads.pop(key, None)
+        threads[key] = story_id  # newest last
+        DATA.mkdir(parents=True, exist_ok=True)
+        THREADS.write_text(json.dumps(threads, indent=2) + "\n")
 
     story = fetch(story_id)
     kids = story.get("kids", [])
@@ -92,7 +111,7 @@ def main():
     with ThreadPoolExecutor(16) as ex:
         items = [i for i in ex.map(fetch, kids) if i]
 
-    out_dir = ROOT / "data" / key
+    out_dir = DATA / key
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "posts.json"
     existing = {p["id"]: p for p in json.loads(out.read_text())["posts"]} if out.exists() else {}
@@ -127,7 +146,7 @@ def main():
         "posts": posts,
     }, indent=1, ensure_ascii=False))
     live = sum(not p["removed"] for p in posts)
-    print(f"{live} live posts (+{added} new, {updated} edited) -> {out.relative_to(ROOT)}")
+    print(f"{live} live posts (+{added} new, {updated} edited) -> {out}")
 
 
 if __name__ == "__main__":

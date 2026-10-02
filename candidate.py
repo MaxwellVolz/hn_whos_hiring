@@ -4,16 +4,13 @@ Lives in profile/ (gitignored), edited from the dashboard's Profile page:
     profile/profile.json   answers and preferences
     profile/resume.pdf     the file attached to applications
     profile/resume.md      resume text the scorer reads (extracted from the PDF, editable)
-Set HN_PROFILE_DIR to keep it somewhere else.
+Set HN_PROFILE_DIR to keep it somewhere else (see config.py).
 """
 import json
-import os
 import shutil
 import subprocess
-from pathlib import Path
 
-ROOT = Path(__file__).parent
-DIR = Path(os.environ.get("HN_PROFILE_DIR", ROOT / "profile"))
+from config import CLAUDE, PROFILE as DIR
 JSON, PDF, TEXT = DIR / "profile.json", DIR / "resume.pdf", DIR / "resume.md"
 
 # key, label, kind, hint. kind: text | textarea | list (one item per line)
@@ -78,7 +75,7 @@ def save_resume_pdf(blob):
         text = subprocess.run(["pdftotext", "-layout", str(PDF), "-"], capture_output=True, text=True).stdout
     else:  # no poppler: let headless Claude read the PDF
         out = subprocess.run(
-            ["claude", "-p", "--model", "haiku", "--output-format", "json", "--tools", "Read",
+            [CLAUDE, "-p", "--model", "haiku", "--output-format", "json", "--tools", "Read",
              "--allowedTools", "Read", "--strict-mcp-config", "--no-session-persistence"],
             input=f"Read the PDF at {PDF} and output its full text as clean Markdown, nothing else.",
             capture_output=True, text=True, timeout=300)
