@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Profile</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e4e3de;
+  --accent: #c2410c; --good: #15803d; --bad: #b91c1c;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141413; --panel: #1d1d1b; --ink: #ecebe6; --muted: #9a9993; --line: #2e2e2b;
+    --accent: #fb923c; --good: #4ade80; --bad: #f87171; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
+header h1 { font-size: 15px; margin: 0; }
+header a { color: var(--muted); font-size: 13px; margin-left: auto; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 80px; }
+.intro { color: var(--muted); margin: 0 0 20px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; }
+section h2 { margin: 0 0 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+label { display: block; font-weight: 600; margin: 12px 0 4px; }
+label:first-of-type { margin-top: 0; }
+input, textarea, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; }
+textarea { min-height: 70px; resize: vertical; }
+textarea.resume { min-height: 240px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+button { width: auto; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 9px 18px; }
+a { color: var(--accent); }
+.hint { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.status { font-size: 13px; }
+.ok { color: var(--good); } .err { color: var(--bad); }
+.bar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+</style>
+</head>
+<body>
+<header><h1>Your profile</h1><a href="/">← Back to matches</a></header>
+<main>
+  <p class="intro">Everything here stays on this machine, in <code>profile/</code>. Postings are scored against it, emails are written from it, and form prefill uses its answers. Only fill in answers you'd stand behind in an interview.</p>
+  <section>
+    <h2>Resume</h2>
+    <label for="pdf">Resume PDF</label>
+    <div class="row"><input id="pdf" type="file" accept="application/pdf" style="flex:1"><span id="pdfstatus" class="status"></span></div>
+    <div class="hint">This file gets attached to applications. Its text is extracted below; fix anything the extraction got wrong.</div>
+    <label for="resume_text">Resume text (what the scorer reads)</label>
+    <textarea id="resume_text" class="resume" placeholder="Upload a PDF above, or paste your resume here."></textarea>
+  </section>
+  <div id="sections"></div>
+  <div class="bar"><button class="primary" id="save">Save profile</button><span id="savestatus" class="status"></span></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let FIELDS = [];
+
+async function init() {
+  const r = await (await fetch("/api/profile")).json();
+  FIELDS = r.fields;
+  $("resume_text").value = r.resume_text || "";
+  if (r.has_pdf) $("pdfstatus").innerHTML = `<a href="/resume.pdf" target="_blank">resume.pdf</a> saved`;
+  $("sections").innerHTML = FIELDS.map(([title, fields]) => `<section><h2>${esc(title)}</h2>${fields.map(([key, label, kind, hint]) => {
+    let v = r.data[key] ?? "";
+    if (kind === "list") v = Array.isArray(v) ? v.join("\n") : v;
+    const ph = kind === "text" ? esc(hint) : "";
+    const input = kind === "text"
+      ? `<input id="f_${key}" value="${esc(v)}" placeholder="${ph}">`
+      : `<textarea id="f_${key}" placeholder="${esc(hint)}">${esc(v)}</textarea>`;
+    return `<label for="f_${key}">${esc(label)}</label>${input}`;
+  }).join("")}</section>`).join("");
+}
+
+$("pdf").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $("pdfstatus").textContent = "Extracting text…";
+  try {
+    const r = await fetch("/api/resume", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: await f.arrayBuffer() });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    if (j.resume_text) $("resume_text").value = j.resume_text;
+    $("pdfstatus").innerHTML = j.resume_text ? `<span class="ok">Saved, text extracted ✓</span>` : `<span class="err">Saved, but couldn't extract text. Paste it below.</span>`;
+  } catch (err) { $("pdfstatus").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+};
+
+$("save").onclick = async () => {
+  const data = {};
+  FIELDS.forEach(([, fields]) => fields.forEach(([key, , kind]) => {
+    const v = $("f_" + key).value.trim();
+    if (v) data[key] = kind === "list" ? v.split("\n").map(s => s.trim()).filter(Boolean) : v;
+  }));
+  const r = await (await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data, resume_text: $("resume_text").value }) })).json();
+  $("savestatus").innerHTML = r.ready
+    ? `<span class="ok">Saved ✓</span> <a href="/">Go to matches →</a>`
+    : `<span class="err">Saved. Add your name, role focus and resume text to start scoring.</span>`;
+};
+init();
+</script>
+</body>
+</html>

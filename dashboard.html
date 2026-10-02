@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HN Job Matches</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e4e3de;
+  --accent: #c2410c; --good: #15803d; --mid: #a16207; --bad: #b91c1c; --chip: #f0efea; --sel: #fff4ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141413; --panel: #1d1d1b; --ink: #ecebe6; --muted: #9a9993; --line: #2e2e2b;
+    --accent: #fb923c; --good: #4ade80; --mid: #facc15; --bad: #f87171; --chip: #2a2a27; --sel: #2b2119; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", sans-serif; }
+header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
+header h1 { font-size: 15px; margin: 0 8px 0 0; }
+header a { color: var(--muted); font-size: 12px; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-left: auto; }
+input, select, textarea, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; height: calc(100vh - 57px); }
+#list { overflow-y: auto; border-right: 1px solid var(--line); }
+.row { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 42px 1fr; gap: 10px; }
+.row:hover { background: var(--chip); }
+.row.sel { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
+.row.dim { opacity: .45; }
+.score { font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; text-align: center; }
+.s-hi { color: var(--good); } .s-md { color: var(--mid); } .s-lo { color: var(--muted); }
+.co { font-weight: 600; }
+.sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.chip { background: var(--chip); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--muted); }
+.chip.st-interested { color: var(--good); } .chip.st-applied { color: var(--accent); } .chip.st-skip { color: var(--bad); }
+#detail { overflow-y: auto; padding: 20px 28px 60px; }
+#detail h2 { margin: 0 0 2px; font-size: 22px; }
+.meta { color: var(--muted); margin-bottom: 14px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.box h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.box ul { margin: 0; padding-left: 18px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.status button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+pre.post { white-space: pre-wrap; word-wrap: break-word; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre.post a { color: var(--accent); }
+textarea { width: 100%; }
+.kbd { color: var(--muted); font-size: 11px; }
+.empty { color: var(--muted); padding: 40px; text-align: center; }
+@media (max-width: 800px) {
+  main { grid-template-columns: 1fr; height: auto; }
+  #list { max-height: 45vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  #detail { padding: 16px; }
+  .cols { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>HN Who's Hiring: matches</h1>
+  <a id="thread" target="_blank"></a>
+  <span id="count" class="kbd"></span>
+  <button id="refresh" title="Fetch new posts from the thread and score them">Refresh</button>
+  <a href="/setup">Profile</a>
+  <div class="filters">
+    <input id="q" placeholder="Search…" size="14">
+    <select id="cat"><option value="">All roles</option><option value="ai">AI/LLM</option><option value="fullstack">Full-stack</option><option value="hardware">Hardware</option><option value="infra">Infra</option><option value="other">Other</option></select>
+    <select id="loc"><option value="">Any location fit</option><option value="good">Location: good</option><option value="good,maybe">Good + maybe</option></select>
+    <select id="st"><option value="active">Hide skipped</option><option value="">All statuses</option><option value="new">New</option><option value="interested">Interested</option><option value="drafted">Drafted</option><option value="applied">Applied</option><option value="skip">Skipped</option></select>
+    <label class="kbd">min <input id="min" type="number" value="0" min="0" max="100" style="width:56px"></label>
+  </div>
+</header>
+<main>
+  <div id="list"></div>
+  <div id="detail"><div class="empty">Select a job. Keys: j/k move, i interested, a applied, s skip, d draft email, o open apply link.</div></div>
+</main>
+<script>
+let DATA = { jobs: [] }, view = [], sel = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sc = n => n == null ? "s-lo" : n >= 75 ? "s-hi" : n >= 50 ? "s-md" : "s-lo";
+const modeLabel = { remote_us: "Remote US", remote_global: "Remote global", remote_other_region: "Remote (non-US)", hybrid: "Hybrid", onsite: "Onsite", unknown: "?" };
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+async function load() {
+  DATA = await api("/api/jobs");
+  const t = DATA.thread || {};
+  $("thread").textContent = t.title || DATA.key; $("thread").href = t.url || "#";
+  showRefresh(DATA.refresh);
+  render();
+}
+
+function showRefresh(r) {
+  const last = (r.log || "").trim().split("\n").pop();
+  $("refresh").disabled = r.running;
+  $("refresh").textContent = r.running ? `Refreshing… ${last.slice(0, 40)}` : "Refresh";
+}
+
+$("refresh").onclick = async () => {
+  await api("/api/refresh", {});
+  const poll = setInterval(async () => {
+    const r = await api("/api/refresh");
+    showRefresh(r);
+    if (!r.running) { clearInterval(poll); load(); }
+  }, 2000);
+};
+
+function filtered() {
+  const q = $("q").value.toLowerCase(), cat = $("cat").value, loc = $("loc").value, st = $("st").value, min = +$("min").value || 0;
+  return DATA.jobs.filter(j => {
+    const m = j.match || {}, s = j.state.status;
+    if (cat && m.role_category !== cat) return false;
+    if (loc && !loc.split(",").includes(m.location_fit)) return false;
+    if (st === "active" && s === "skip") return false;
+    if (st && st !== "active" && s !== st) return false;
+    if ((m.score ?? 0) < min) return false;
+    if (q && !(j.post.text + " " + (m.company || "")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function render() {
+  view = filtered();
+  const scored = DATA.jobs.filter(j => j.match).length;
+  $("count").textContent = `${view.length} shown · ${scored}/${DATA.jobs.length} scored`;
+  $("list").innerHTML = view.map(j => {
+    const m = j.match || {}, s = j.state.status;
+    return `<div class="row ${sel === j.post.id ? "sel" : ""} ${s === "skip" ? "dim" : ""}" data-id="${j.post.id}">
+      <div class="score ${sc(m.score)}">${m.score ?? "–"}</div>
+      <div><div class="co">${esc(m.company || j.post.company_guess)}</div>
+        <div class="sub">${esc(m.best_role || j.post.header)}</div>
+        <div class="chips">${m.work_mode ? `<span class="chip">${modeLabel[m.work_mode]}</span>` : ""}
+          ${m.role_category ? `<span class="chip">${m.role_category}</span>` : ""}
+          ${m.salary ? `<span class="chip">${esc(m.salary)}</span>` : ""}
+          ${s !== "new" ? `<span class="chip st-${s}">${s}</span>` : ""}
+          ${j.draft ? `<span class="chip">✉ draft</span>` : ""}</div></div></div>`;
+  }).join("") || `<div class="empty">No jobs match these filters.</div>`;
+  if (sel) renderDetail();
+}
+
+function linkify(t) { return esc(t).replace(/https?:\/\/[^\s<)]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`); }
+
+function gmailUrl(d) {
+  const p = new URLSearchParams({ view: "cm", fs: "1", to: d.to || "", su: d.subject || "", body: d.body || "" });
+  return "https://mail.google.com/mail/?" + p.toString();
+}
+
+function renderDetail() {
+  const j = DATA.jobs.find(x => x.post.id === sel);
+  if (!j) return;
+  const m = j.match || {}, p = j.post, s = j.state.status, d = j.draft;
+  const applyUrl = m.apply_url || p.urls[0];
+  $("detail").innerHTML = `
+    <h2><span class="${sc(m.score)}">${m.score ?? "–"}</span> · ${esc(m.company || p.company_guess)}</h2>
+    <div class="meta">${esc(m.company_blurb || "")}<br>${esc((m.roles || []).join(" · "))}<br>
+      ${esc((m.locations || []).join(", "))} · ${modeLabel[m.work_mode] || ""} · location fit: <b>${m.location_fit || "?"}</b>
+      ${m.salary ? " · " + esc(m.salary) : ""}${m.stage ? " · " + esc(m.stage) : ""}
+      · <a href="${p.hn_url}" target="_blank">HN post</a> by ${esc(p.author)}</div>
+    <div class="actions status">
+      ${["interested", "applied", "skip", "new"].map(x => `<button data-status="${x}" class="${s === x ? "on" : ""}">${x}</button>`).join("")}
+    </div>
+    <div class="cols">
+      <div class="box"><h3>Why it fits</h3><ul>${(m.reasons || []).map(r => `<li>${esc(r)}</li>`).join("") || "<li>Not scored yet</li>"}</ul></div>
+      <div class="box"><h3>Concerns</h3><ul>${(m.concerns || []).map(r => `<li>${esc(r)}</li>`).join("") || "<li>None noted</li>"}</ul></div>
+    </div>
+    <div class="box"><h3>Apply</h3>
+      ${m.apply_instructions ? `<p>${esc(m.apply_instructions)}</p>` : ""}
+      <div class="actions">
+        ${applyUrl ? `<a href="${esc(applyUrl)}" target="_blank" rel="noopener"><button class="primary" id="open">Open apply link ↗</button></a>` : ""}
+        <button id="gen">${d ? "Regenerate email" : "Draft email"}</button>
+        ${applyUrl ? `<button id="qprefill" ${j.queued.includes("prefill") ? "disabled" : ""}>${j.queued.includes("prefill") ? "Queued: prefill form" : "Queue form prefill (Claude)"}</button>` : ""}
+      </div>
+      <div class="kbd">${(m.apply_email || p.emails.join(", ")) ? "Email: " + esc(m.apply_email || p.emails.join(", ")) : "No email in post"}${m.tech?.length ? " · Tech: " + esc(m.tech.join(", ")) : ""}</div>
+    </div>
+    <div id="draftbox">${d ? draftHtml(d, j) : ""}</div>
+    <h3 class="kbd" style="margin-top:20px">POST</h3>
+    <pre class="post box">${linkify(p.text)}</pre>
+    <h3 class="kbd">NOTES</h3>
+    <textarea id="notes" rows="3" placeholder="Your notes…">${esc(j.state.notes || "")}</textarea>`;
+  bindDetail(j);
+}
+
+function draftHtml(d, j) {
+  return `<div class="box" style="margin-top:14px"><h3>Email draft</h3>
+    <input id="dto" value="${esc(d.to)}" placeholder="to" style="width:100%;margin-bottom:6px">
+    <input id="dsub" value="${esc(d.subject)}" style="width:100%;margin-bottom:6px">
+    <textarea id="dbody" rows="12">${esc(d.body)}</textarea>
+    <div class="actions">
+      <button id="dsave">Save edits</button>
+      <a id="dgmail" href="${esc(gmailUrl(d))}" target="_blank" rel="noopener"><button class="primary">Open in Gmail compose ↗</button></a>
+      <button id="qgmail" ${j.queued.includes("gmail_draft") ? "disabled" : ""}>${j.queued.includes("gmail_draft") ? "Queued: Gmail draft" : "Queue Gmail draft + resume (Claude)"}</button>
+    </div><div class="kbd">Gmail compose can't attach files. The queued route creates a real Gmail draft with your resume PDF attached.</div></div>`;
+}
+
+async function setStatus(status) {
+  const j = DATA.jobs.find(x => x.post.id === sel);
+  j.state = await api("/api/state", { id: sel, status });
+  render();
+}
+
+async function genDraft(force) {
+  const btn = $("gen"); btn.disabled = true; btn.textContent = "Writing… (~20s)";
+  try {
+    const j = DATA.jobs.find(x => x.post.id === sel);
+    j.draft = await api("/api/draft", { id: sel, force });
+    if (j.state.status === "new" || j.state.status === "interested") j.state = await api("/api/state", { id: sel, status: "drafted" });
+    render();
+  } catch (e) { btn.textContent = "Failed: " + e.message; btn.disabled = false; }
+}
+
+function bindDetail(j) {
+  document.querySelectorAll("[data-status]").forEach(b => b.onclick = () => setStatus(b.dataset.status));
+  $("gen").onclick = () => genDraft(!!j.draft);
+  if ($("qprefill")) $("qprefill").onclick = async () => { await api("/api/queue", { id: sel, action: "prefill" }); await load(); };
+  $("notes").onchange = async e => { j.state = await api("/api/state", { id: sel, notes: e.target.value }); };
+  if (j.draft) {
+    const cur = () => ({ to: $("dto").value, subject: $("dsub").value, body: $("dbody").value });
+    const sync = () => { $("dgmail").href = gmailUrl(cur()); };
+    ["dto", "dsub", "dbody"].forEach(id => $(id).oninput = sync);
+    $("dsave").onclick = async () => { j.draft = await api("/api/draft/save", { id: sel, ...cur() }); $("dsave").textContent = "Saved ✓"; };
+    $("qgmail").onclick = async () => { j.draft = await api("/api/draft/save", { id: sel, ...cur() }); await api("/api/queue", { id: sel, action: "gmail_draft" }); await load(); };
+  }
+}
+
+$("list").onclick = e => { const r = e.target.closest(".row"); if (r) { sel = +r.dataset.id; render(); } };
+["q", "cat", "loc", "st", "min"].forEach(id => $(id).oninput = render);
+document.addEventListener("keydown", e => {
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
+  const i = view.findIndex(j => j.post.id === sel);
+  const move = n => { const j = view[Math.max(0, Math.min(view.length - 1, i + n))]; if (j) { sel = j.post.id; render(); document.querySelector(".row.sel")?.scrollIntoView({ block: "nearest" }); } };
+  if (e.key === "j") move(1); else if (e.key === "k") move(-1);
+  else if (sel && e.key === "i") setStatus("interested");
+  else if (sel && e.key === "a") setStatus("applied");
+  else if (sel && e.key === "s") { setStatus("skip"); move(1); }
+  else if (sel && e.key === "d") $("gen")?.click();
+  else if (sel && e.key === "o") $("open")?.click();
+});
+load();
+</script>
+</body>
+</html>
