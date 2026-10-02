@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HN Job Matches</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <style>
 :root {
   --bg: #f7f7f5; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e4e3de;
@@ -17,6 +18,15 @@
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", sans-serif; }
 header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
 header h1 { font-size: 15px; margin: 0 8px 0 0; }
+.profile-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 13px !important; font-weight: 600; color: var(--ink) !important; text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px 5px 6px; }
+.profile-btn:hover { border-color: var(--accent); }
+.profile-btn img { width: 18px; height: 18px; }
+#splash { position: fixed; inset: 0; z-index: 10; background: #fff; display: flex; align-items: center; justify-content: center; transition: opacity .7s ease; }
+#splash img { width: min(640px, 80vw); }
+#splash.out { opacity: 0; pointer-events: none; }
+header, main { transition: opacity .7s ease .15s; }
+body.loading header, body.loading main { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #splash, header, main { transition: none; } }
 header a { color: var(--muted); font-size: 12px; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-left: auto; }
 input, select, textarea, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
@@ -59,13 +69,14 @@ textarea { width: 100%; }
 }
 </style>
 </head>
-<body>
+<body class="loading">
+<div id="splash"><img src="/static/logo.png" alt="Hacker News: Who's Hiring?"></div>
 <header>
+  <a href="/setup" class="profile-btn" title="Your resume, preferences and application answers"><img src="/static/favicon.svg" alt="">Profile</a>
   <h1>HN Who's Hiring: matches</h1>
   <a id="thread" target="_blank"></a>
   <span id="count" class="kbd"></span>
   <button id="refresh" title="Fetch new posts from the thread and score them">Refresh</button>
-  <a href="/setup">Profile</a>
   <div class="filters">
     <input id="q" placeholder="Search…" size="14">
     <select id="cat"><option value="">All roles</option><option value="ai">AI/LLM</option><option value="fullstack">Full-stack</option><option value="hardware">Hardware</option><option value="infra">Infra</option><option value="other">Other</option></select>
@@ -247,7 +258,18 @@ document.addEventListener("keydown", e => {
   else if (sel && e.key === "d") $("gen")?.click();
   else if (sel && e.key === "o") $("open")?.click();
 });
-load();
+// Splash: once per browser session, held for at least 1.2s, then the UI fades in.
+// A profile that isn't filled out sends you to the Profile page once the splash is done.
+const seen = (() => { try { return sessionStorage.getItem("splashSeen"); } catch { return null; } })();
+const minSplash = new Promise(r => setTimeout(r, seen ? 0 : 1200));
+Promise.all([load(), minSplash]).then(() => {
+  try { sessionStorage.setItem("splashSeen", "1"); } catch {}
+  if (!DATA.profile_ready) return location.replace("/setup");
+  $("splash").classList.add("out");
+  document.body.classList.remove("loading");
+  setTimeout(() => $("splash").remove(), 800);
+}).catch(() => { $("splash").remove(); document.body.classList.remove("loading"); });
+
 </script>
 </body>
 </html>

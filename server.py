@@ -92,11 +92,12 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
-            if not candidate.ready():
-                self.send_response(302)
-                self.send_header("Location", "/setup")
-                return self.end_headers()
             return self.send(200, (ROOT / "dashboard.html").read_bytes(), "text/html; charset=utf-8")
+        if self.path.startswith("/static/"):
+            f = ROOT / "static" / Path(self.path).name
+            types = {".png": "image/png", ".svg": "image/svg+xml"}
+            if f.is_file() and f.suffix in types:
+                return self.send(200, f.read_bytes(), types[f.suffix])
         if self.path == "/setup":
             return self.send(200, (ROOT / "setup.html").read_bytes(), "text/html; charset=utf-8")
         if self.path == "/api/jobs":
