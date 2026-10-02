@@ -1,5 +1,8 @@
 <p align="center">
-  <img alt="Hacker News: Who's Hiring?" src="docs/logo.png" width="560">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png">
+    <img alt="Hacker News: Who's Hiring?" src="docs/logo.png" width="560">
+  </picture>
 </p>
 
 <h3 align="center">Every post in Hacker News' monthly "Who is hiring?" thread, ranked against your resume.</h3>
